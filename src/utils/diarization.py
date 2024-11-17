@@ -126,7 +126,6 @@ def transcribe_audio(filepath, model_name=WHISPER_MODEL_NAME):
 
 
 async def transcribe_with_replicate(audio_path):
-    REPLICATE_API_TOKEN = d357df52df4e3b9cda83f6f1ed300076f3825755
     audio = open(audio_path, "rb")
     input = {"audio": audio}
 
