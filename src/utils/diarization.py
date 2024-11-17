@@ -121,6 +121,7 @@ def transcribe_audio(filepath, model_name=WHISPER_MODEL_NAME):
     # Transcribe audio
     result = model.transcribe(filepath)
     # Get segments
+
     segments = result["segments"]
     return segments
 
