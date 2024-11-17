@@ -22,15 +22,17 @@ logging.basicConfig(level=logging.INFO)
 
 # Parameters with default values
 MERGE_CONSECUTIVE_SEGMENTS = True
-WINDOW_SIZE = 1.0          # in seconds
-HOP_SIZE = 0.75            # in seconds
+WINDOW_SIZE = 1.0  # in seconds
+HOP_SIZE = 0.75  # in seconds
 SMOOTHING_WINDOW_SIZE = 5
 WHISPER_MODEL_NAME = "turbo"  # Options: "tiny", "base", "small", "medium", "medium.en", "large", "large-v3", "turbo"
+
 
 def load_audio(filepath, target_sr=16000):
     # Load audio with librosa
     audio, sr = librosa.load(filepath, sr=target_sr)
     return audio, sr
+
 
 def segment_audio(audio, sr, window_size=WINDOW_SIZE, hop_size=HOP_SIZE):
     # Split audio into overlapping windows
@@ -44,6 +46,7 @@ def segment_audio(audio, sr, window_size=WINDOW_SIZE, hop_size=HOP_SIZE):
         timestamps.append((start / sr, end / sr))
     return segments, timestamps
 
+
 def get_embeddings(segments, encoder):
     embeddings = []
     for seg in segments:
@@ -52,10 +55,14 @@ def get_embeddings(segments, encoder):
     embeddings = np.vstack(embeddings)
     return embeddings
 
+
 def smooth_labels(labels, window_size=SMOOTHING_WINDOW_SIZE):
-    smoothed_labels = uniform_filter1d(labels.astype(float), size=window_size, mode='nearest')
+    smoothed_labels = uniform_filter1d(
+        labels.astype(float), size=window_size, mode="nearest"
+    )
     smoothed_labels = np.round(smoothed_labels).astype(int)
     return smoothed_labels
+
 
 def estimate_num_speakers(embeddings, min_speakers=1, max_speakers=10):
     """
@@ -85,7 +92,9 @@ def estimate_num_speakers(embeddings, min_speakers=1, max_speakers=10):
 
         # Skip silhouette score if only 1 cluster
         if len(np.unique(labels)) == 1:
-            logging.info(f"Only one cluster found with {n_speakers} speakers. Skipping silhouette score.")
+            logging.info(
+                f"Only one cluster found with {n_speakers} speakers. Skipping silhouette score."
+            )
             continue
 
         # Calculate the silhouette score for this clustering
@@ -99,8 +108,11 @@ def estimate_num_speakers(embeddings, min_speakers=1, max_speakers=10):
             best_num_speakers = n_speakers
             best_labels = labels
 
-    logging.info(f"Best number of speakers: {best_num_speakers} with a Silhouette Score of {best_score}")
+    logging.info(
+        f"Best number of speakers: {best_num_speakers} with a Silhouette Score of {best_score}"
+    )
     return best_labels
+
 
 def transcribe_audio(filepath, model_name=WHISPER_MODEL_NAME):
     # Load Whisper model
@@ -112,14 +124,32 @@ def transcribe_audio(filepath, model_name=WHISPER_MODEL_NAME):
     segments = result["segments"]
     return segments
 
-def assign_speakers_to_transcripts(transcript_segments, diarization_labels, diarization_timestamps):
+
+async def transcribe_with_replicate(audio_path):
+    REPLICATE_API_TOKEN = d357df52df4e3b9cda83f6f1ed300076f3825755
+    audio = open(audio_path, "rb")
+    input = {"audio": audio}
+
+    prediction = await replicate.predictions.async_create(
+        version="cdd97b257f93cb89dede1c7584e3f3dfc969571b357dbcee08e793740bedd854",
+        input=input,
+    )
+
+    transcription = prediction.get("text")
+    print(transcription)
+    return [], transcription
+
+
+def assign_speakers_to_transcripts(
+    transcript_segments, diarization_labels, diarization_timestamps
+):
     speaker_transcripts = []
     for segment in transcript_segments:
-        start = segment['start']
-        end = segment['end']
-        text = segment['text']
+        start = segment["start"]
+        end = segment["end"]
+        text = segment["text"]
         # Find the diarization label(s) for this segment
-        speaker_label = 'Unknown'
+        speaker_label = "Unknown"
         speaker_counts = {}
         for idx, (d_start, d_end) in enumerate(diarization_timestamps):
             # Check for overlap
@@ -130,13 +160,11 @@ def assign_speakers_to_transcripts(transcript_segments, diarization_labels, diar
         if speaker_counts:
             # Assign the speaker with the maximum overlap
             speaker_label = max(speaker_counts, key=speaker_counts.get)
-        speaker_transcripts.append({
-            'start': start,
-            'end': end,
-            'speaker': speaker_label,
-            'text': text.strip()
-        })
+        speaker_transcripts.append(
+            {"start": start, "end": end, "speaker": speaker_label, "text": text.strip()}
+        )
     return speaker_transcripts
+
 
 def merge_consecutive_speaker_segments(speaker_transcripts):
     merged_segments = []
@@ -145,10 +173,10 @@ def merge_consecutive_speaker_segments(speaker_transcripts):
     for segment in speaker_transcripts:
         if current_segment is None:
             current_segment = segment.copy()
-        elif segment['speaker'] == current_segment['speaker']:
+        elif segment["speaker"] == current_segment["speaker"]:
             # Merge the text and update the end time
-            current_segment['text'] += ' ' + segment['text']
-            current_segment['end'] = segment['end']
+            current_segment["text"] += " " + segment["text"]
+            current_segment["end"] = segment["end"]
         else:
             # Append the current segment and start a new one
             merged_segments.append(current_segment)
@@ -160,14 +188,16 @@ def merge_consecutive_speaker_segments(speaker_transcripts):
 
     return merged_segments
 
+
 def format_output(speaker_transcripts):
     lines = []
     for segment in speaker_transcripts:
-        start_time = format_timestamp(segment['start'])
-        speaker = segment['speaker']
-        text = segment['text']
+        start_time = format_timestamp(segment["start"])
+        speaker = segment["speaker"]
+        text = segment["text"]
         lines.append(f"=== {start_time} ({speaker}) ===\n{text}\n")
     return "\n".join(lines)
+
 
 def format_timestamp(seconds):
     # Format seconds into hh:mm:ss format
@@ -178,6 +208,7 @@ def format_timestamp(seconds):
         return f"{hours:02d}:{minutes:02d}:{secs:02d}"
     else:
         return f"{minutes:02d}:{secs:02d}"
+
 
 def main(audio_filepath, output_filepath=None):
     logging.info("Loading audio file...")
@@ -192,9 +223,11 @@ def main(audio_filepath, output_filepath=None):
     logging.info("Smoothing labels...")
     labels = smooth_labels(labels)
     logging.info("Transcribing audio...")
-    transcript_segments = transcribe_audio(audio_filepath)
+    transcript_segments = transcribe_with_replicate(audio_filepath)
     logging.info("Assigning speaker labels to transcripts...")
-    speaker_transcripts = assign_speakers_to_transcripts(transcript_segments, labels, timestamps)
+    speaker_transcripts = assign_speakers_to_transcripts(
+        transcript_segments, labels, timestamps
+    )
 
     if MERGE_CONSECUTIVE_SEGMENTS:
         logging.info("Merging consecutive segments with the same speaker...")
@@ -205,14 +238,18 @@ def main(audio_filepath, output_filepath=None):
     print(output)
 
     if output_filepath:
-        with open(output_filepath, 'w', encoding='utf-8') as f:
+        with open(output_filepath, "w", encoding="utf-8") as f:
             f.write(output)
         logging.info(f"\nTranscription has been saved to {output_filepath}")
 
+
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) < 2:
-        print("Usage: python diarization_script.py path_to_audio_file [output_textfile.txt]")
+        print(
+            "Usage: python diarization_script.py path_to_audio_file [output_textfile.txt]"
+        )
         sys.exit(1)
     audio_filepath = sys.argv[1]
     output_filepath = sys.argv[2] if len(sys.argv) > 2 else None
