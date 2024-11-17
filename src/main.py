@@ -46,7 +46,7 @@ from utils.utils import print_startup_message, safe_split_message
 from config_loader import ConfigLoader  # Import ConfigLoader
 
 
-users_allowed = ["14320903"]
+users_allowed = [14320903]
 
 # Configure basic logging
 logging.basicConfig(
@@ -748,6 +748,7 @@ class TranscriberBot:
         self, update: Update, context: CallbackContext
     ) -> None:
         user_id = update.effective_user.id
+        logger.info(user_id)
         if user_id not in users_allowed:
             return
         voice = update.message.voice
@@ -782,6 +783,8 @@ class TranscriberBot:
         logger.info("handle_audio_file called.")
 
         user_id = update.effective_user.id
+
+        logger.info(user_id)
 
         if user_id not in users_allowed:
             return
@@ -866,6 +869,7 @@ class TranscriberBot:
         logger.info("handle_video_file called.")
 
         user_id = update.effective_user.id
+        logger.info(user_id)
         if user_id not in users_allowed:
             return
 
